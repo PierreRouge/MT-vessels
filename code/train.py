@@ -160,19 +160,6 @@ if __name__ == "__main__":
             outputs = model(volume_batch)
             with torch.no_grad():
                 ema_output = ema_model(ema_inputs)
-            T = 8
-            volume_batch_r = unlabeled_volume_batch.repeat(2, 1, 1, 1, 1)
-            stride = volume_batch_r.shape[0] // 2
-            preds = torch.zeros([stride * T, 2, patch_size[0], patch_size[1], patch_size[2]]).cuda()
-            for i in range(T//2):
-                ema_inputs = volume_batch_r + torch.clamp(torch.randn_like(volume_batch_r) * 0.1, -0.2, 0.2)
-                with torch.no_grad():
-                    preds[2 * stride * i:2 * stride * (i + 1)] = ema_model(ema_inputs)
-            preds = F.softmax(preds, dim=1)
-            preds = preds.reshape(T, stride, 2, patch_size[0], patch_size[1], patch_size[2])
-            preds = torch.mean(preds, dim=0)  #(batch, 2, 112,112,80)
-            uncertainty = -1.0*torch.sum(preds*torch.log(preds + 1e-6), dim=1, keepdim=True) #(batch, 1, 112,112,80)
-
 
             ## calculate the loss
             loss_seg = F.cross_entropy(outputs[:labeled_bs], label_batch[:labeled_bs])
@@ -182,9 +169,8 @@ if __name__ == "__main__":
 
             consistency_weight = get_current_consistency_weight(iter_num//21) #21 because there are 21 iterations per epoch
             consistency_dist = consistency_criterion(outputs[labeled_bs:], ema_output) #(batch, 2, 112,112,80)
-            threshold = (0.75+0.25*ramps.sigmoid_rampup(iter_num, max_iterations))*np.log(2)
-            mask = (uncertainty<threshold).float()
-            consistency_dist = torch.sum(mask*consistency_dist)/(2*torch.sum(mask)+1e-16)
+           
+            consistency_dist = torch.sum(consistency_dist)
             consistency_loss = consistency_weight * consistency_dist
             loss = supervised_loss + consistency_loss
 
@@ -194,11 +180,6 @@ if __name__ == "__main__":
             update_ema_variables(model, ema_model, args.ema_decay, iter_num)
 
             iter_num = iter_num + 1
-            writer.add_scalar('uncertainty/mean', uncertainty[0,0].mean(), iter_num)
-            writer.add_scalar('uncertainty/max', uncertainty[0,0].max(), iter_num)
-            writer.add_scalar('uncertainty/min', uncertainty[0,0].min(), iter_num)
-            writer.add_scalar('uncertainty/mask_per', torch.sum(mask)/mask.numel(), iter_num)
-            writer.add_scalar('uncertainty/threshold', threshold, iter_num)
             writer.add_scalar('lr', lr_, iter_num)
             writer.add_scalar('loss/loss', loss, iter_num)
             writer.add_scalar('loss/loss_seg', loss_seg, iter_num)
@@ -224,14 +205,6 @@ if __name__ == "__main__":
                 grid_image = make_grid(utils.decode_seg_map_sequence(image.data.cpu().numpy()), 5, normalize=False)
                 writer.add_image('train/Groundtruth_label', grid_image, iter_num)
 
-                image = uncertainty[0, 0:1, :, :, 20:61:10].permute(3, 0, 1, 2).repeat(1, 3, 1, 1)
-                grid_image = make_grid(image, 5, normalize=True)
-                writer.add_image('train/uncertainty', grid_image, iter_num)
-
-                mask2 = (uncertainty > threshold).float()
-                image = mask2[0, 0:1, :, :, 20:61:10].permute(3, 0, 1, 2).repeat(1, 3, 1, 1)
-                grid_image = make_grid(image, 5, normalize=True)
-                writer.add_image('train/mask', grid_image, iter_num)
                 #####
                 image = volume_batch[-1, 0:1, :, :, 20:61:10].permute(3, 0, 1, 2).repeat(1, 3, 1, 1)
                 grid_image = make_grid(image, 5, normalize=True)
