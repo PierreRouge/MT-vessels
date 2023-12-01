@@ -37,6 +37,7 @@ parser.add_argument('--deterministic', type=int,  default=1, help='whether use d
 parser.add_argument('--labelnum', type=int,  default=3, help='Number of labeled samples')
 parser.add_argument('--maxsamples', type=int,  default=94, help='Number of total samples')
 parser.add_argument('--random_state', type=int,  default=1, help='Random state for data splitting')
+parser.add_argument('--niter_epoch', type=int,  default=150, help='Number of iterations defining an epoch (for sigmoid rampup)')
 parser.add_argument('--patch_size', nargs='+', type=int, default=[128, 128, 128], help='Patch _size')
 parser.add_argument('--seed', type=int,  default=1337, help='random seed')
 parser.add_argument('--gpu', type=str,  default='0', help='GPU to use')
@@ -171,7 +172,7 @@ if __name__ == "__main__":
             loss_seg_dice = losses.dice_loss(outputs_soft[:labeled_bs, 1, :, :, :], label_batch[:labeled_bs] == 1)
             supervised_loss = 0.5*(loss_seg+loss_seg_dice)
 
-            consistency_weight = get_current_consistency_weight(iter_num//21) #21 because there are 21 iterations per epoch
+            consistency_weight = get_current_consistency_weight(iter_num//args.niter_epoch) #21 because there are 21 iterations per epoch
             consistency_dist = consistency_criterion(outputs[labeled_bs:], ema_output) #(batch, 2, 112,112,80)
            
             consistency_dist = torch.sum(consistency_dist)
