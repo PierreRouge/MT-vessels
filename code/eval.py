@@ -21,9 +21,8 @@ from skimage.measure import label
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dir_inputs', type=str, default='../../../Thèse_Rougé_Pierre/res_semi_supervised/UA-MT/UA-MT-Bullitt_18_labeled_post', help='Path')
-parser.add_argument('--postprocessing', type=bool,  default=False, help='prostprocessing or not')
-parser.add_argument('--topo', type=bool,  default=False, help='Compute topological metrics')
-
+parser.add_argument('--postprocessing', type=bool, default=False, help='prostprocessing or not')
+parser.add_argument('--topo', type=bool, default=False, help='Compute topological metrics')
 
 args = parser.parse_args()
 

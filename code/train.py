@@ -9,6 +9,8 @@ import time
 import random
 import numpy as np
 
+from sklearn.model_selection import train_test_split
+
 import torch
 import torch.optim as optim
 from torchvision import transforms
@@ -24,7 +26,7 @@ from utils import ramps, losses
 from dataloaders.la_heart import LAHeart, RandomCrop, CenterCrop, RandomRotFlip, ToTensor, TwoStreamBatchSampler
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--root_path', type=str, default='../data/IXI_Bullitt_training_set/', help='Name of Experiment')
+parser.add_argument('--root_path', type=str, default='../../data/Bullitt_training_set/Patients', help='Name of Experiment')
 parser.add_argument('--dataset', type=str,  default='Bullitt', help='Dataset to use')
 parser.add_argument('--exp', type=str,  default='UAMT_unlabel', help='model_name')
 parser.add_argument('--max_iterations', type=int,  default=6000, help='maximum epoch number to train')
@@ -32,8 +34,9 @@ parser.add_argument('--batch_size', type=int, default=4, help='batch_size per gp
 parser.add_argument('--labeled_bs', type=int, default=2, help='labeled_batch_size per gpu')
 parser.add_argument('--base_lr', type=float,  default=0.01, help='maximum epoch number to train')
 parser.add_argument('--deterministic', type=int,  default=1, help='whether use deterministic training')
-parser.add_argument('--labelnum', type=int,  default=34, help='Number of labeled samples')
-parser.add_argument('--maxsamples', type=int,  default=350, help='Number of total samples')
+parser.add_argument('--labelnum', type=int,  default=3, help='Number of labeled samples')
+parser.add_argument('--maxsamples', type=int,  default=94, help='Number of total samples')
+parser.add_argument('--random_state', type=int,  default=1, help='Random state for data splitting')
 parser.add_argument('--patch_size', nargs='+', type=int, default=[128, 128, 128], help='Patch _size')
 parser.add_argument('--seed', type=int,  default=1337, help='random seed')
 parser.add_argument('--gpu', type=str,  default='0', help='GPU to use')
@@ -119,8 +122,9 @@ if __name__ == "__main__":
                            ToTensor()
                        ]))
     
-    labeled_idxs = list(range(args.labelnum))
-    unlabeled_idxs = list(range(args.labelnum, args.maxsamples))
+    idxs = np.arange(0, args.maxsamples)
+    labeled_idxs, unlabeled_idxs = train_test_split(idxs, train_size=args.labelnum, random_state=args.random_state)
+       
     batch_sampler = TwoStreamBatchSampler(labeled_idxs, unlabeled_idxs, batch_size, batch_size-labeled_bs)
     def worker_init_fn(worker_id):
         random.seed(args.seed+worker_id)
